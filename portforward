@@ -1,0 +1,223 @@
+#!/usr/bin/python
+
+from urllib import urlencode
+import sys
+import os
+import pycurl as curl
+import argparse
+from StringIO import StringIO
+import re
+parser= argparse.ArgumentParser()
+parser.add_argument('-s','--service',help='The name of the service inside of the router port tables')
+parser.add_argument('-p','--port' ,help='''The port you wish to specify for the service to use\nNOTE: Usually this should be the port 
+		that the service is running on''',type=int)
+parser.add_argument('-ip','--ip',help='The ip of the computer running the service that is being opened')
+parser.add_argument('-n','--new-name',help='The name you wish to rename the service default=service Usage: -s SERVICE_NAME -p PORT -ip SERVER_IP -n/--new-name')
+parser.add_argument('-l','--list',help='List the current services on the router Usage: portforward -l',nargs='?', const=1, type=int)
+parser.add_argument('-a','--add',help='Set the flag to create a new port forward Usage:\n -s SERVICE_NAME -p PORT -ip SERVER_IP -a/--add',nargs='?', const=1, type=int)
+parser.add_argument('-d','--delete', help='Delete the given service Usage: -s SERVICE_NAME -d/--delete',nargs='?', const=1, type=int)
+args = parser.parse_args()
+
+if len(sys.argv) == 1:
+	os.system('portforward -h')
+	sys.exit(0)
+
+ip=args.ip
+service_name=args.service
+port=args.port
+new_name=args.new_name
+list_service=args.list
+add=args.add
+delete=args.delete
+headers={}
+
+#Function to examine incoming headers
+def header_function(header_line):
+	if ':' not in header_line:
+		return
+	name,value = header_line.split(':',1)
+	name=name.strip()
+	value=value.strip()
+	#name=name.lower()
+	headers[name]=value
+
+def service_sort(data):
+	hosts=[]
+	ports=[]
+	ips=[]
+	data=data.splitlines()
+	#Finds all the avalible hosts by html scraping
+	for i in data:
+		if "service-name" in i:
+			if 'headers="service_name"' not in i:
+				if 'id=' not in i:
+					i = i.split('>')
+					i=i[1]	
+					i=i.split('<')
+					i=i[0]
+					hosts.append(i)
+	#Finds all the port numbers in the same order as the service names by html scraping
+	for i in data:
+		if 'start-port' in i and 'headers=start-port' not in i and 'id=' not in i:
+			i=i.split('>')
+			i=i[1]
+			i=i.split('<')
+			i=i[0]
+			ports.append(i)
+	#Finda all the ips of the services by html scraping
+	for i in data:
+		if 'server-ip' in i and 'headers="service-ip"' not in i and 'id=' not in i:
+			i=i.split('>')
+			i=i[1]
+                        i=i.split('<')
+                        i=i[0]
+                        ips.append(i)
+	#Removes any empty strings or nulls form lists hosts,ports,ips
+	for i in hosts:
+		if i == '' or i == 'null':
+			hosts.remove(i)
+	for i in ports:
+		if i=='' or i =='null':
+			ports.remove(i)
+	for i in ips:
+		 if i=='' or i=="null":
+			ips.remove(i)
+	del ips[-1]
+	#Generates the list of services, ports,and ips into a dictonary and prints them
+	combined={}
+	for host,port,ip in zip(hosts,ports,ips):
+		value=" is on port: \033[36m" + str(port) + "\033[0m and the server ip is: \033[36m" + str(ip) + "\033[0m"
+		combined[host] =value
+	for i in hosts:
+		print "Service: \033[36m" +i+ "\033[0m" + str(combined[i])
+	os.system('rm -f cookie.jar')
+	sys.exit(0)
+
+#Grabs a session cookie by loging in with the below credentials
+buffer=StringIO()
+c = curl.Curl()
+c.setopt(c.URL, 'http://10.0.0.1/check.php')
+c.setopt(c.FOLLOWLOCATION,True)
+c.setopt(c.HTTPHEADER,['Referer: http://10.0.0.1/'])
+c.setopt(c.WRITEDATA,buffer)
+c.setopt(c.COOKIEJAR,'cookie.jar')
+c.setopt(c.POSTFIELDS,'username=YOUR_USERNAME&password=YOUR_PASSWORD')
+c.setopt(c.COOKIEFILE,'cookie.jar')
+c.perform()
+c.close()
+
+
+
+#Gather the html to scrape for id or names of active services
+buffer = StringIO()
+
+c2=curl.Curl()
+c2.setopt(c2.URL,'http://10.0.0.1/port_forwarding.php')
+c2.setopt(c2.WRITEDATA,buffer)
+c2.setopt(c2.HTTPHEADER,['Referer: 10.0.0.1/at_a_glance.php'])
+#c2.setopt(curl.HEADERFUNCTION,header_function)
+c2.setopt(c2.FOLLOWLOCATION,True)
+c2.setopt(c2.COOKIEFILE,'cookie.jar')
+c2.setopt(c2.COOKIEJAR,'cookie.jar')
+c2.perform()
+c2.close()
+
+#Get the id of the service specified if --add/-a is not set
+if add is None:
+	if list_service is not None:
+		data=buffer.getvalue()
+		service_sort(data)
+	else:
+		try:
+			data= buffer.getvalue()
+			data=data.splitlines()
+			lines=[]
+			for i in data:
+				if service_name in i:
+					lines.append(i)
+			line=str(lines[1])
+			line=line.split('_')
+			line=line[1]
+                	line=line.split('"')
+              	  	line=str(line[0])
+                	id=line
+		except IndexError:
+			try:
+				for i in lines:
+					if '_' in i:
+						line=i
+				line=line.split('_')
+				line=line[1]
+				line=line.split('"')
+				line=line[0]
+				id=line
+			except Exception:
+				print "That Service doesn't exist"
+				sys.exit(1)
+			
+#Reset cookie...Honestly this here is really useless and has no point
+#buffer=StringIO()
+#c3=curl.Curl()
+id_url='Referer: http://10.0.0.1/port_forwarding_edit.php?id='+str(id)
+#c3.setopt(c3.URL,id_url)
+#c3.setopt(c3.FOLLOWLOCATION,True)
+#c3.setopt(c3.WRITEDATA,buffer)
+#c3.setopt(c3.COOKIEJAR,'cookie.jar')
+#c3.setopt(c3.COOKIEFILE,'cookie.jar')
+#c3.perform()
+#c3.close()
+
+#Grabs X-Csrf Token and sends it back to server
+buffer=StringIO()
+c4=curl.Curl()
+c4.setopt(c4.URL,'10.0.0.1/actionHandler/ajax_at_a_glance.php')
+c4.setopt(c4.HTTPHEADER, ['Referer 10.0.0.1/at_a_glance.php'])
+c4.setopt(curl.HEADERFUNCTION,header_function)
+c4.setopt(c4.WRITEDATA,buffer)
+c4.perform()
+c4.close()
+
+if 'X-Csrf-Token' in headers:
+	token='X-Csrf-Token: ' + headers['X-Csrf-Token']
+buffer=StringIO()
+c5=curl.Curl()
+c5.setopt(c5.URL,'10.0.0.1/actionHandler/ajaxSet_userbar.php')
+c5.setopt(c5.COOKIEFILE,'cookie.jar')
+c5.setopt(c5.COOKIEJAR,'cookie.jar')
+c5.setopt(c5.WRITEDATA,buffer)
+c5.setopt(c5.HTTPHEADER,[id_url,token,'X-Requested-With: XMLHttpRequest'])
+c5.perform()
+c5.close()
+
+#Generate and encode the post/change request with the arguements given to the program and decides to either use a edit request or add request
+buffer=StringIO()
+if add is None:
+	#Edit request
+	if new_name is None:
+		#Uses this post scheme if -n arguement is not specified
+		post ={"edit" : "true", "ID" : id , "name" : service_name , "type" : "TCP/UDP" , "ip" : str(ip) , "ipv6addr" : "x" , "startport" : str(port) , "endport" : str(port)}
+	else:
+		#Uses this post scheme if the -n argument is specified
+		post ={"edit" : "true", "ID" : id , "name" : new_name , "type" : "TCP/UDP" , "ip" : str(ip) , "ipv6addr" : "x" , "startport" : str(port) , "endport" : str(port)}
+	#Add Request
+else:
+	post ={"add" : "true", "name" : service_name , "type" : "TCP/UDP" , "ip" : str(ip) , "ipv6addr" : "x" , "startport" : str(port) , "endport" : str(port)}
+post = urlencode(post)
+
+c6=curl.Curl()
+c6.setopt(c6.URL,'http://10.0.0.1/actionHandler/ajax_port_forwarding.php')
+c6.setopt(c6.COOKIEFILE,'cookie.jar')
+c6.setopt(c6.COOKIEJAR,'cookie.jar')
+c6.setopt(c6.WRITEDATA,buffer)
+c6.setopt(c6.HTTPHEADER,[id_url,token,'X-Requested-With: XMLHttpRequest'])
+
+# Change post to delete the given service
+if delete is not None:
+	post={'del' : str(id)}
+	post=urlencode(post)
+
+c6.setopt(c6.POSTFIELDS,post)
+c6.perform()
+c6.close()
+
+os.system('rm -f cookie.jar')
