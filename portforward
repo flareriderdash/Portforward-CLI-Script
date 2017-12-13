@@ -109,13 +109,21 @@ buffer=StringIO()
 c = curl.Curl()
 c.setopt(c.URL, 'http://'+url+'/check.php')
 c.setopt(c.PORT, port)
+
+if wlan is not None:
+	c.setopt(c.SSL_VERIFYPEER,0)
+
 c.setopt(c.FOLLOWLOCATION,True)
 c.setopt(c.HTTPHEADER,['Referer: http://'+url+'/'])
 c.setopt(c.WRITEDATA,buffer)
 c.setopt(c.COOKIEJAR,'cookie.jar')
 c.setopt(c.POSTFIELDS,'username=YOUR_USERNAME&password=YOUR_PASSWORD')
 c.setopt(c.COOKIEFILE,'cookie.jar')
-c.perform()
+try:
+	c.perform()
+except Exception:
+	print "Hmmmm... That didn't work. Are you sure thats the correct port? Or the http server is up?"
+	sys.exit(1)
 c.close()
 
 
@@ -127,7 +135,11 @@ c2=curl.Curl()
 c2.setopt(c2.URL,'http://'+url+'/port_forwarding.php')
 c2.setopt(c.PORT, port)
 c2.setopt(c2.WRITEDATA,buffer)
-c2.setopt(c2.HTTPHEADER,['Referer: '+url+'/at_a_glance.php'])
+
+if wlan is not None:
+        c2.setopt(c.SSL_VERIFYPEER,0)
+
+c2.setopt(c2.HTTPHEADER,['Referer: 10.0.0.1/at_a_glance.php'])
 #c2.setopt(curl.HEADERFUNCTION,header_function)
 c2.setopt(c2.FOLLOWLOCATION,True)
 c2.setopt(c2.COOKIEFILE,'cookie.jar')
@@ -185,6 +197,10 @@ buffer=StringIO()
 c4=curl.Curl()
 c4.setopt(c4.URL,'http://'+url+'/actionHandler/ajax_at_a_glance.php')
 c4.setopt(c.PORT, port)
+
+if wlan is not None:
+        c4.setopt(c.SSL_VERIFYPEER,0)
+
 c4.setopt(c4.HTTPHEADER, ['Referer http://'+url+'/at_a_glance.php'])
 c4.setopt(curl.HEADERFUNCTION,header_function)
 c4.setopt(c4.WRITEDATA,buffer)
@@ -197,6 +213,10 @@ buffer=StringIO()
 c5=curl.Curl()
 c5.setopt(c5.URL,'http://'+url+'/actionHandler/ajaxSet_userbar.php')
 c5.setopt(c.PORT, port)
+
+if wlan is not None:
+        c5.setopt(c.SSL_VERIFYPEER,0)
+
 c5.setopt(c5.COOKIEFILE,'cookie.jar')
 c5.setopt(c5.COOKIEJAR,'cookie.jar')
 c5.setopt(c5.WRITEDATA,buffer)
@@ -222,6 +242,10 @@ post = urlencode(post)
 c6=curl.Curl()
 c6.setopt(c6.URL,'http://'+url+'/actionHandler/ajax_port_forwarding.php')
 c6.setopt(c.PORT, port)
+
+if wlan is not None:
+        c6.setopt(c.SSL_VERIFYPEER,0)
+
 c6.setopt(c6.COOKIEFILE,'cookie.jar')
 c6.setopt(c6.COOKIEJAR,'cookie.jar')
 c6.setopt(c6.WRITEDATA,buffer)
