@@ -16,6 +16,7 @@ parser.add_argument('-n','--new-name',help='The name you wish to rename the serv
 parser.add_argument('-l','--list',help='List the current services on the router Usage: portforward -l',nargs='?', const=1, type=int)
 parser.add_argument('-a','--add',help='Set the flag to create a new port forward Usage:\n -s SERVICE_NAME -p PORT -ip SERVER_IP -a/--add',nargs='?', const=1, type=int)
 parser.add_argument('-d','--delete', help='Delete the given service Usage: -s SERVICE_NAME -d/--delete',nargs='?', const=1, type=int)
+parser.add_argument('-w','--wlan',help="Use the port forwards over wlan NOTE: UNSECURE DOES NOT USE HTTPS Usage: -s SERVICE_NAME -p PORT -ip SERVER_IP -w/--wlan {HOSTNAME OR WLAN_IP}:PORT default=10.0.0.1:80")
 args = parser.parse_args()
 
 if len(sys.argv) == 1:
@@ -29,7 +30,17 @@ new_name=args.new_name
 list_service=args.list
 add=args.add
 delete=args.delete
+wlan=args.wlan
 headers={}
+
+#Determines the ipaddress of the router/ap
+if wlan is not None:
+	address=wlan.split(':')
+	url=address[0]
+	port=int(address[1])
+else:
+	url="10.0.0.1"
+	port=int("80")
 
 #Function to examine incoming headers
 def header_function(header_line):
@@ -96,9 +107,10 @@ def service_sort(data):
 #Grabs a session cookie by loging in with the below credentials
 buffer=StringIO()
 c = curl.Curl()
-c.setopt(c.URL, 'http://10.0.0.1/check.php')
+c.setopt(c.URL, 'http://'+url+'/check.php')
+c.setopt(c.PORT, port)
 c.setopt(c.FOLLOWLOCATION,True)
-c.setopt(c.HTTPHEADER,['Referer: http://10.0.0.1/'])
+c.setopt(c.HTTPHEADER,['Referer: http://'+url+'/'])
 c.setopt(c.WRITEDATA,buffer)
 c.setopt(c.COOKIEJAR,'cookie.jar')
 c.setopt(c.POSTFIELDS,'username=YOUR_USERNAME&password=YOUR_PASSWORD')
@@ -112,7 +124,8 @@ c.close()
 buffer = StringIO()
 
 c2=curl.Curl()
-c2.setopt(c2.URL,'http://10.0.0.1/port_forwarding.php')
+c2.setopt(c2.URL,'http://'+url+'/port_forwarding.php')
+c2.setopt(c.PORT, port)
 c2.setopt(c2.WRITEDATA,buffer)
 c2.setopt(c2.HTTPHEADER,['Referer: 10.0.0.1/at_a_glance.php'])
 #c2.setopt(curl.HEADERFUNCTION,header_function)
@@ -158,7 +171,7 @@ if add is None:
 #Reset cookie...Honestly this here is really useless and has no point
 #buffer=StringIO()
 #c3=curl.Curl()
-id_url='Referer: http://10.0.0.1/port_forwarding_edit.php?id='+str(id)
+id_url='Referer: http://'+url+'/port_forwarding_edit.php?id='+str(id)
 #c3.setopt(c3.URL,id_url)
 #c3.setopt(c3.FOLLOWLOCATION,True)
 #c3.setopt(c3.WRITEDATA,buffer)
@@ -170,8 +183,9 @@ id_url='Referer: http://10.0.0.1/port_forwarding_edit.php?id='+str(id)
 #Grabs X-Csrf Token and sends it back to server
 buffer=StringIO()
 c4=curl.Curl()
-c4.setopt(c4.URL,'10.0.0.1/actionHandler/ajax_at_a_glance.php')
-c4.setopt(c4.HTTPHEADER, ['Referer 10.0.0.1/at_a_glance.php'])
+c4.setopt(c4.URL,'http://'+url+'/actionHandler/ajax_at_a_glance.php')
+c4.setopt(c.PORT, port)
+c4.setopt(c4.HTTPHEADER, ['Referer http://'+url+'/at_a_glance.php'])
 c4.setopt(curl.HEADERFUNCTION,header_function)
 c4.setopt(c4.WRITEDATA,buffer)
 c4.perform()
@@ -181,7 +195,8 @@ if 'X-Csrf-Token' in headers:
 	token='X-Csrf-Token: ' + headers['X-Csrf-Token']
 buffer=StringIO()
 c5=curl.Curl()
-c5.setopt(c5.URL,'10.0.0.1/actionHandler/ajaxSet_userbar.php')
+c5.setopt(c5.URL,'http://'+url+'/actionHandler/ajaxSet_userbar.php')
+c5.setopt(c.PORT, port)
 c5.setopt(c5.COOKIEFILE,'cookie.jar')
 c5.setopt(c5.COOKIEJAR,'cookie.jar')
 c5.setopt(c5.WRITEDATA,buffer)
@@ -205,7 +220,8 @@ else:
 post = urlencode(post)
 
 c6=curl.Curl()
-c6.setopt(c6.URL,'http://10.0.0.1/actionHandler/ajax_port_forwarding.php')
+c6.setopt(c6.URL,'http://'+url+'/actionHandler/ajax_port_forwarding.php')
+c6.setopt(c.PORT, port)
 c6.setopt(c6.COOKIEFILE,'cookie.jar')
 c6.setopt(c6.COOKIEJAR,'cookie.jar')
 c6.setopt(c6.WRITEDATA,buffer)
